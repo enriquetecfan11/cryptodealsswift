@@ -17,168 +17,220 @@ struct PortfolioView: View {
     }
     
     var body: some View {
-        ZStack {
-            VStack(alignment: .leading, spacing: 24) {
-                // Balance y estadísticas
-                portfolioHeaderView
+        GeometryReader { geometry in
+            ZStack {
+                VStack(alignment: .leading, spacing: adaptiveSpacing) {
+                    // Balance y estadísticas
+                    portfolioHeaderView
+                    
+                    // Botones de acción
+                    actionButtonsView
+                    
+                    // Lista de posiciones
+                    positionsListView
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, adaptivePadding)
+                .padding(.vertical, adaptivePadding * 0.75)
+                .adaptiveFrame()
+                .background(Color.mainBackground.ignoresSafeArea())
+                .navigationTitle("Mi Portafolio")
+                .onAppear {
+                    cryptoViewModel.fetchCryptos()
+                    portfolioViewModel.refreshPrices()
+                }
+                .sheet(isPresented: $showingAddPosition) {
+                    AddPositionView(
+                        portfolioViewModel: portfolioViewModel,
+                        cryptoViewModel: cryptoViewModel
+                    )
+                }
+                .sheet(item: $editingPosition) { position in
+                    AddPositionView(
+                        portfolioViewModel: portfolioViewModel,
+                        cryptoViewModel: cryptoViewModel,
+                        editingPosition: position
+                    )
+                }
                 
-                // Botones de acción
-                actionButtonsView
-                
-                // Lista de posiciones
-                positionsListView
-                
-                Spacer()
-            }
-            .padding()
-            .background(Color.mainBackground.ignoresSafeArea())
-            .navigationTitle("Mi Portafolio")
-            .onAppear {
-                cryptoViewModel.fetchCryptos()
-                portfolioViewModel.refreshPrices()
-            }
-            .sheet(isPresented: $showingAddPosition) {
-                AddPositionView(
-                    portfolioViewModel: portfolioViewModel,
-                    cryptoViewModel: cryptoViewModel
-                )
-            }
-            .sheet(item: $editingPosition) { position in
-                AddPositionView(
-                    portfolioViewModel: portfolioViewModel,
-                    cryptoViewModel: cryptoViewModel,
-                    editingPosition: position
-                )
-            }
-            
-            // Indicador de carga
-            if portfolioViewModel.isLoading {
-                VStack {
-                    ProgressView("Actualizando precios...")
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.cardBackground))
-                        .shadow(radius: 10)
+                // Indicador de carga
+                if portfolioViewModel.isLoading {
+                    VStack {
+                        ProgressView("Actualizando precios...")
+                            .padding()
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.cardBackground))
+                            .shadow(radius: 10)
+                    }
                 }
             }
+            .blur(radius: portfolioViewModel.isLoading ? 3 : 0)
         }
-        .blur(radius: portfolioViewModel.isLoading ? 3 : 0)
+    }
+    
+    private var adaptiveSpacing: CGFloat {
+        DeviceInfo.isIPad ? 24 : (DeviceInfo.isLargeScreen ? 18 : 16)
+    }
+    
+    private var adaptivePadding: CGFloat {
+        DeviceInfo.isIPad ? 32 : (DeviceInfo.isLargeScreen ? 20 : 16)
+    }
+    
+    private var adaptiveColumns: [GridItem] {
+        if DeviceInfo.isIPad {
+            return Array(repeating: GridItem(.flexible()), count: 2)
+        } else {
+            return [GridItem(.flexible())]
+        }
     }
     
     private var portfolioHeaderView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             // Balance total
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Balance Total")
-                    .font(.headline)
+                    .font(.subheadline)
                     .foregroundColor(.secondaryText)
                 
                 Text(portfolioViewModel.totalPortfolioValue.toCurrency())
-                    .font(.largeTitle.bold())
+                    .font(.title.bold())
                     .foregroundColor(.primaryText)
             }
             
             // Ganancia/Pérdida total
             if !portfolioViewModel.positions.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 3) {
                     let totalGainLoss = portfolioViewModel.getTotalGainLoss()
                     let totalGainLossPercentage = portfolioViewModel.getTotalGainLossPercentage()
                     
                     Text("Ganancia/Pérdida Total")
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundColor(.secondaryText)
                     
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         Text(totalGainLoss.toCurrency())
-                            .font(.title2.bold())
+                            .font(.headline.bold())
                             .foregroundColor(totalGainLoss >= 0 ? .cryptoGreen : .cryptoRed)
                         
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
                             Image(systemName: totalGainLoss >= 0 ? "arrow.up.right" : "arrow.down.right")
                                 .foregroundColor(totalGainLoss >= 0 ? .cryptoGreen : .cryptoRed)
-                                .font(.caption)
+                                .font(.caption2)
                             
                             Text(totalGainLossPercentage.toPercentage())
-                                .font(.headline)
+                                .font(.subheadline.bold())
                                 .foregroundColor(totalGainLoss >= 0 ? .cryptoGreen : .cryptoRed)
                         }
                     }
                 }
             }
         }
-        .padding()
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color.surfaceBackground)
-                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
         )
     }
     
     private var actionButtonsView: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             Button(action: {
                 showingAddPosition = true
             }) {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "plus.circle.fill")
-                    Text("Agregar Posición")
+                        .font(.subheadline)
+                    Text("Agregar")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue.opacity(0.85))
+                .padding(.vertical, 10)
+                .background(Color.cryptoBlue.opacity(0.9))
                 .foregroundColor(.white)
-                .cornerRadius(12)
-                .shadow(color: Color.blue.opacity(0.3), radius: 6, x: 0, y: 2)
+                .cornerRadius(10)
+                .shadow(color: Color.cryptoBlue.opacity(0.3), radius: 4, x: 0, y: 2)
             }
             
             Button(action: {
                 portfolioViewModel.refreshPrices()
             }) {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "arrow.clockwise")
+                        .font(.subheadline)
                     Text("Actualizar")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.green.opacity(0.85))
+                .padding(.vertical, 10)
+                .background(Color.cryptoGreen.opacity(0.9))
                 .foregroundColor(.white)
-                .cornerRadius(12)
-                .shadow(color: Color.green.opacity(0.3), radius: 6, x: 0, y: 2)
+                .cornerRadius(10)
+                .shadow(color: Color.cryptoGreen.opacity(0.3), radius: 4, x: 0, y: 2)
             }
         }
     }
     
     private var positionsListView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Mis Posiciones")
-                .font(.headline)
+                .font(.subheadline.bold())
                 .foregroundColor(.secondaryText)
             
             if portfolioViewModel.positions.isEmpty {
                 emptyStateView
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(portfolioViewModel.positions) { position in
-                            PortfolioPositionCard(
-                                position: position,
-                                currentPrice: portfolioViewModel.getCurrentPrice(for: position.cryptoId),
-                                onEdit: {
-                                    editingPosition = position
-                                },
-                                onDelete: {
-                                    portfolioViewModel.deletePosition(position)
-                                }
-                            )
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    portfolioViewModel.deletePosition(position)
-                                } label: {
-                                    Label("Eliminar", systemImage: "trash")
+                    if DeviceInfo.isIPad {
+                        // Layout de grid para iPad
+                        LazyVGrid(columns: adaptiveColumns, spacing: adaptiveSpacing) {
+                            ForEach(portfolioViewModel.positions) { position in
+                                PortfolioPositionCard(
+                                    position: position,
+                                    currentPrice: portfolioViewModel.getCurrentPrice(for: position.cryptoId),
+                                    onEdit: {
+                                        editingPosition = position
+                                    },
+                                    onDelete: {
+                                        portfolioViewModel.deletePosition(position)
+                                    }
+                                )
+                                .contextMenu {
+                                    Button("Editar", systemImage: "pencil") {
+                                        editingPosition = position
+                                    }
+                                    Button("Eliminar", systemImage: "trash", role: .destructive) {
+                                        portfolioViewModel.deletePosition(position)
+                                    }
                                 }
                             }
                         }
+                        .padding(.horizontal, 4)
+                    } else {
+                        // Layout de lista para iPhone
+                        LazyVStack(spacing: 8) {
+                            ForEach(portfolioViewModel.positions) { position in
+                                PortfolioPositionCard(
+                                    position: position,
+                                    currentPrice: portfolioViewModel.getCurrentPrice(for: position.cryptoId),
+                                    onEdit: {
+                                        editingPosition = position
+                                    },
+                                    onDelete: {
+                                        portfolioViewModel.deletePosition(position)
+                                    }
+                                )
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        portfolioViewModel.deletePosition(position)
+                                    } label: {
+                                        Label("Eliminar", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 4)
                     }
                 }
             }
@@ -186,17 +238,17 @@ struct PortfolioView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             Image(systemName: "chart.pie")
-                .font(.system(size: 50))
+                .font(.system(size: 40))
                 .foregroundColor(.placeholderText)
             
             Text("No tienes posiciones")
-                .font(.headline)
+                .font(.subheadline.bold())
                 .foregroundColor(.secondaryText)
             
             Text("Comienza agregando tu primera criptomoneda")
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundColor(.tertiaryText)
                 .multilineTextAlignment(.center)
             
@@ -204,15 +256,15 @@ struct PortfolioView: View {
                 showingAddPosition = true
             }) {
                 Text("Agregar Primera Posición")
-                    .font(.headline)
+                    .font(.subheadline.bold())
                     .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 20)
                     .background(Color.cryptoBlue)
-                    .cornerRadius(12)
+                    .cornerRadius(10)
             }
         }
-        .padding(.vertical, 40)
+        .padding(.vertical, 24)
     }
 }
 
@@ -229,9 +281,10 @@ struct PortfolioPositionCard: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 14) {
-                // Logo
+        VStack(spacing: 10) {
+            // Header principal más compacto
+            HStack(spacing: 12) {
+                // Logo más pequeño
                 if let url = logoURL {
                     AsyncImage(url: url) { image in
                         image.resizable().scaledToFit()
@@ -240,111 +293,125 @@ struct PortfolioPositionCard: View {
                             .fill(Color.surfaceBackground)
                             .overlay(
                                 Text(position.cryptoSymbol.prefix(1))
-                                    .font(.title2.bold())
+                                    .font(.subheadline.bold())
                                     .foregroundColor(.secondaryText)
                             )
                     }
-                    .frame(width: 45, height: 45)
+                    .frame(width: 36, height: 36)
                 } else {
                     Circle()
                         .fill(Color.surfaceBackground)
-                        .frame(width: 45, height: 45)
+                        .frame(width: 36, height: 36)
                         .overlay(
                             Text(position.cryptoSymbol.prefix(1))
-                                .font(.title2.bold())
+                                .font(.subheadline.bold())
                                 .foregroundColor(.secondaryText)
                         )
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(position.cryptoName)
-                        .font(.headline)
+                        .font(.subheadline.bold())
                         .foregroundColor(.primaryText)
+                        .lineLimit(1)
                     
                     Text(position.cryptoSymbol)
-                        .font(.caption)
-                        .foregroundColor(.secondaryText)
-                    
-                    Text("Invertido: " + position.totalInvested.toCurrency())
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.secondaryText)
                 }
                 
                 Spacer()
                 
-                VStack(alignment: .trailing, spacing: 4) {
+                // Valor actual y ganancia/pérdida
+                VStack(alignment: .trailing, spacing: 1) {
                     if let price = currentPrice {
                         Text(position.currentValue(currentPrice: price).toCurrency())
-                            .font(.headline.bold())
+                            .font(.subheadline.bold())
                             .foregroundColor(.primaryText)
                         
                         let gainLoss = position.totalGainLoss(currentPrice: price)
                         let gainLossPercentage = position.gainLossPercentage(currentPrice: price)
                         
-                        HStack(spacing: 4) {
-                            Image(systemName: gainLoss >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                .foregroundColor(gainLoss >= 0 ? .cryptoGreen : .cryptoRed)
-                                .font(.caption)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            HStack(spacing: 3) {
+                                Image(systemName: gainLoss >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                    .foregroundColor(gainLoss >= 0 ? .cryptoGreen : .cryptoRed)
+                                    .font(.caption2)
+                                
+                                Text(gainLossPercentage.toPercentage())
+                                    .font(.caption2.bold())
+                                    .foregroundColor(gainLoss >= 0 ? .cryptoGreen : .cryptoRed)
+                            }
                             
-                            Text(gainLossPercentage.toPercentage())
-                                .font(.caption.bold())
+                            Text(gainLoss.toCurrency())
+                                .font(.caption2)
                                 .foregroundColor(gainLoss >= 0 ? .cryptoGreen : .cryptoRed)
                         }
-                        
-                        Text(gainLoss.toCurrency())
-                            .font(.caption)
-                            .foregroundColor(gainLoss >= 0 ? .cryptoGreen : .cryptoRed)
                     } else {
                         Text("Cargando...")
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundColor(.placeholderText)
                     }
                 }
             }
             
-            // Información adicional
+            // Información compacta
             if let price = currentPrice {
                 Divider()
+                    .padding(.vertical, 2)
                 
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Precio Actual")
-                            .font(.caption)
-                            .foregroundColor(.secondaryText)
-                        Text(price.toCurrency())
-                            .font(.caption.bold())
-                            .foregroundColor(.primaryText)
+                VStack(spacing: 6) {
+                    // Información esencial en formato compacto
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Precio")
+                                .font(.caption2)
+                                .foregroundColor(.secondaryText)
+                            Text(price.toCurrency())
+                                .font(.caption.bold())
+                                .foregroundColor(.primaryText)
+                        }
+                        
+                        VStack(alignment: .center, spacing: 2) {
+                            Text("Compra")
+                                .font(.caption2)
+                                .foregroundColor(.secondaryText)
+                            Text(position.purchasePrice.toCurrency())
+                                .font(.caption.bold())
+                                .foregroundColor(.primaryText)
+                        }
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Unidades")
+                                .font(.caption2)
+                                .foregroundColor(.secondaryText)
+                            Text(position.amount.cleanAmountString())
+                                .font(.caption.bold())
+                                .foregroundColor(.primaryText)
+                        }
                     }
                     
-                    Spacer()
-                    
-                    VStack(alignment: .center, spacing: 2) {
-                        Text("Precio Compra")
-                            .font(.caption)
-                            .foregroundColor(.secondaryText)
-                        Text(position.purchasePrice.toCurrency())
-                            .font(.caption.bold())
-                            .foregroundColor(.primaryText)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Fecha Compra")
-                            .font(.caption)
-                            .foregroundColor(.secondaryText)
+                    // Información adicional en una línea
+                    HStack {
+                        Text("Invertido: " + position.totalInvested.toCurrency())
+                            .font(.caption2)
+                            .foregroundColor(.tertiaryText)
+                        
+                        Spacer()
+                        
                         Text(position.purchaseDate.toShortString())
-                            .font(.caption.bold())
-                            .foregroundColor(.primaryText)
+                            .font(.caption2)
+                            .foregroundColor(.tertiaryText)
                     }
                 }
             }
         }
-        .padding()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color.cardBackground)
-                .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         )
         .onLongPressGesture {
             showingActionSheet = true

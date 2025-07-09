@@ -38,5 +38,10 @@ struct MainTabView: View {
                     Text("Portafolio")
                 }
         }
+        .font(adaptiveTabFont)
+    }
+    
+    private var adaptiveTabFont: Font {
+        DeviceInfo.isIPad ? .footnote : .caption2
     }
 }

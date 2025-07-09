@@ -4,6 +4,37 @@ extension View {
     func scaleEffectOnTap() -> some View {
         modifier(ScaleEffectOnTap())
     }
+    
+    func adaptiveFrame() -> some View {
+        modifier(AdaptiveFrameModifier())
+    }
+}
+
+// MARK: - Device Detection
+struct DeviceInfo {
+    static var isIPad: Bool {
+        return UIDevice.current.userInterfaceIdiom == .pad
+    }
+    
+    static var isIPhone: Bool {
+        return UIDevice.current.userInterfaceIdiom == .phone
+    }
+    
+    static var screenWidth: CGFloat {
+        return UIScreen.main.bounds.width
+    }
+    
+    static var screenHeight: CGFloat {
+        return UIScreen.main.bounds.height
+    }
+    
+    static var isLargeScreen: Bool {
+        return screenWidth > 390 // iPhone 14 Pro Max and larger
+    }
+    
+    static var isSmallScreen: Bool {
+        return screenWidth <= 375 // iPhone SE and smaller
+    }
 }
 
 // MARK: - Color Extensions for Dark Mode Support
@@ -33,6 +64,13 @@ struct ScaleEffectOnTap: ViewModifier {
                     pressed = isPressing
                 }
             }, perform: {})
+    }
+}
+
+struct AdaptiveFrameModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: DeviceInfo.isIPad ? 800 : .infinity)
     }
 }
 

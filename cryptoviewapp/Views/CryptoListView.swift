@@ -11,63 +11,107 @@ struct CryptoListView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Todas las criptomonedas")
-                        .font(.title2).bold()
-                        .padding([.top, .horizontal])
-                    if viewModel.cryptos.isEmpty {
-                        HStack { Spacer() }
-                        ProgressView("Cargando...")
-                            .padding(.vertical, 40)
-                        HStack { Spacer() }
-                    } else {
-                        List {
-                            ForEach(viewModel.cryptos) { crypto in
-                                Button(action: {
-                                    viewModel.fetchCryptoDetail(id: crypto.id) { success in
-                                        if success {
-                                            self.detailId = crypto.id
-                                            self.navigate = true
+            GeometryReader { geometry in
+                ZStack {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Todas las criptomonedas")
+                            .font(DeviceInfo.isIPad ? .title.bold() : .title2.bold())
+                            .padding([.top, .horizontal], adaptivePadding)
+                            
+                        if viewModel.cryptos.isEmpty {
+                            HStack { Spacer() }
+                            ProgressView("Cargando...")
+                                .padding(.vertical, 40)
+                            HStack { Spacer() }
+                        } else {
+                            if DeviceInfo.isIPad {
+                                // Layout de grid para iPad
+                                ScrollView {
+                                    LazyVGrid(columns: adaptiveColumns, spacing: adaptiveSpacing) {
+                                        ForEach(viewModel.cryptos) { crypto in
+                                            Button(action: {
+                                                viewModel.fetchCryptoDetail(id: crypto.id) { success in
+                                                    if success {
+                                                        self.detailId = crypto.id
+                                                        self.navigate = true
+                                                    }
+                                                }
+                                            }) {
+                                                CryptoRowPro(crypto: crypto)
+                                                    .padding(.vertical, 4)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
                                         }
                                     }
-                                }) {
-                                    CryptoRowPro(crypto: crypto)
-                                        .listRowInsets(EdgeInsets())
-                                        .padding(.vertical, 4)
+                                    .padding(.horizontal, adaptivePadding)
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .listRowBackground(Color.clear)
+                            } else {
+                                // Layout de lista para iPhone
+                                List {
+                                    ForEach(viewModel.cryptos) { crypto in
+                                        Button(action: {
+                                            viewModel.fetchCryptoDetail(id: crypto.id) { success in
+                                                if success {
+                                                    self.detailId = crypto.id
+                                                    self.navigate = true
+                                                }
+                                            }
+                                        }) {
+                                            CryptoRowPro(crypto: crypto)
+                                                .listRowInsets(EdgeInsets())
+                                                .padding(.vertical, 4)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .listRowBackground(Color.clear)
+                                    }
+                                }
+                                .listStyle(PlainListStyle())
                             }
                         }
-                        .listStyle(PlainListStyle())
+                        Spacer()
                     }
-                    Spacer()
-                }
-                .blur(radius: viewModel.isLoadingDetail ? 3 : 0)
-                
-                // Indicador de carga superpuesto
-                if viewModel.isLoadingDetail {
-                    VStack {
-                        ProgressView("Cargando detalles...")
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.cardBackground))
-                            .shadow(radius: 10)
+                    .adaptiveFrame()
+                    .blur(radius: viewModel.isLoadingDetail ? 3 : 0)
+                    
+                    // Indicador de carga superpuesto
+                    if viewModel.isLoadingDetail {
+                        VStack {
+                            ProgressView("Cargando detalles...")
+                                .padding()
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.cardBackground))
+                                .shadow(radius: 10)
+                        }
                     }
                 }
-            }
-            .background(Color.mainBackground.ignoresSafeArea())
-            .environmentObject(viewModel)
-            .onAppear {
-                viewModel.fetchCryptos()
-            }
-            .navigationTitle("Lista")
-            .navigationDestination(isPresented: $navigate) {
-                if let id = detailId {
-                    CryptoDetailView(cryptoId: id)
+                .background(Color.mainBackground.ignoresSafeArea())
+                .environmentObject(viewModel)
+                .onAppear {
+                    viewModel.fetchCryptos()
+                }
+                .navigationTitle("Lista")
+                .navigationDestination(isPresented: $navigate) {
+                    if let id = detailId {
+                        CryptoDetailView(cryptoId: id)
+                    }
                 }
             }
         }
+    }
+    
+    private var adaptiveColumns: [GridItem] {
+        if DeviceInfo.isIPad {
+            return Array(repeating: GridItem(.flexible()), count: 2)
+        } else {
+            return [GridItem(.flexible())]
+        }
+    }
+    
+    private var adaptiveSpacing: CGFloat {
+        DeviceInfo.isIPad ? 16 : 12
+    }
+    
+    private var adaptivePadding: CGFloat {
+        DeviceInfo.isIPad ? 24 : (DeviceInfo.isLargeScreen ? 20 : 16)
     }
     
     @ViewBuilder
@@ -85,8 +129,9 @@ struct CryptoRowPro: View {
     var logoURL: URL? {
         URL(string: "https://s2.coinmarketcap.com/static/img/coins/64x64/\(crypto.id).png")
     }
+    
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: adaptiveSpacing) {
             if let url = logoURL {
                 AsyncImage(url: url) { image in
                     image.resizable().scaledToFit()
@@ -95,52 +140,89 @@ struct CryptoRowPro: View {
                         .fill(Color.surfaceBackground)
                         .overlay(
                             Text(crypto.symbol.prefix(1))
-                                .font(.title2.bold())
+                                .font(adaptiveSymbolFont)
                                 .foregroundColor(.secondaryText)
                         )
                 }
-                .frame(width: 40, height: 40)
+                .frame(width: adaptiveLogoSize, height: adaptiveLogoSize)
             } else {
                 Circle()
                     .fill(Color.surfaceBackground)
-                    .frame(width: 40, height: 40)
+                    .frame(width: adaptiveLogoSize, height: adaptiveLogoSize)
                     .overlay(
                         Text(crypto.symbol.prefix(1))
-                            .font(.title2.bold())
+                            .font(adaptiveSymbolFont)
                             .foregroundColor(.secondaryText)
                     )
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(crypto.name)
-                    .font(.headline)
+                    .font(adaptiveNameFont)
                     .foregroundColor(.primaryText)
+                    .lineLimit(1)
                 Text(crypto.symbol)
-                    .font(.caption)
+                    .font(adaptiveCaptionFont)
                     .foregroundColor(.secondaryText)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(crypto.quote?.USD?.price?.formatted(.currency(code: "USD")) ?? "-")
-                    .font(.headline)
+                    .font(adaptivePriceFont)
                     .foregroundColor(.primaryText)
                 let change = crypto.quote?.USD?.percent_change_24h ?? 0
                 HStack(spacing: 4) {
                     Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
                         .foregroundColor(change >= 0 ? .cryptoGreen : .cryptoRed)
-                        .font(.caption)
+                        .font(adaptiveCaptionFont)
                     Text(String(format: "%+.2f%%", change))
-                        .font(.caption.bold())
+                        .font(adaptiveCaptionFont.bold())
                         .foregroundColor(change >= 0 ? .cryptoGreen : .cryptoRed)
                 }
             }
         }
-        .padding()
+        .padding(adaptivePadding)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: adaptiveCornerRadius)
                 .fill(Color.cardBackground)
-                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(0.06), radius: adaptiveShadowRadius, x: 0, y: 2)
         )
         .scaleEffectOnTap()
+    }
+    
+    private var adaptiveSpacing: CGFloat {
+        DeviceInfo.isIPad ? 18 : (DeviceInfo.isLargeScreen ? 16 : 14)
+    }
+    
+    private var adaptiveLogoSize: CGFloat {
+        DeviceInfo.isIPad ? 50 : (DeviceInfo.isLargeScreen ? 44 : 40)
+    }
+    
+    private var adaptivePadding: CGFloat {
+        DeviceInfo.isIPad ? 20 : (DeviceInfo.isLargeScreen ? 16 : 12)
+    }
+    
+    private var adaptiveCornerRadius: CGFloat {
+        DeviceInfo.isIPad ? 16 : 14
+    }
+    
+    private var adaptiveShadowRadius: CGFloat {
+        DeviceInfo.isIPad ? 8 : 6
+    }
+    
+    private var adaptiveNameFont: Font {
+        DeviceInfo.isIPad ? .title3.bold() : .headline
+    }
+    
+    private var adaptivePriceFont: Font {
+        DeviceInfo.isIPad ? .title3.bold() : .headline
+    }
+    
+    private var adaptiveCaptionFont: Font {
+        DeviceInfo.isIPad ? .footnote : .caption
+    }
+    
+    private var adaptiveSymbolFont: Font {
+        DeviceInfo.isIPad ? .title3.bold() : .headline
     }
 }
 
