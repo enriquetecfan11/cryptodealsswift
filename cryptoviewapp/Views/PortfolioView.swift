@@ -54,15 +54,11 @@ struct PortfolioView: View {
                     )
                 }
                 
-                // Indicador de carga
-                if portfolioViewModel.isLoading {
-                    VStack {
-                        ProgressView("Actualizando precios...")
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.cardBackground))
-                            .shadow(radius: 10)
-                    }
-                }
+                // Indicador de carga mejorado
+                LoadingOverlay(
+                    message: "Actualizando precios...\nEsto puede tomar unos momentos",
+                    isLoading: portfolioViewModel.isLoading
+                )
             }
             .blur(radius: portfolioViewModel.isLoading ? 3 : 0)
         }

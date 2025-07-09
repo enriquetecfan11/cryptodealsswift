@@ -3,199 +3,276 @@ import SwiftUI
 struct CryptoDetailView: View {
     @EnvironmentObject var viewModel: CryptoViewModel
     let cryptoId: String
+    @State private var hasAppeared = false
     
     private var crypto: Cryptocurrency? {
         viewModel.getCrypto(by: cryptoId)
     }
     
     var body: some View {
+        Group {
+            if let crypto = crypto {
+                // Contenido principal cuando hay datos
+                cryptoDetailContent(crypto: crypto)
+            } else {
+                // Estados de carga y error
+                ZStack {
+                    Color.mainBackground.ignoresSafeArea()
+                    
+                    VStack {
+                        if viewModel.detailLoadingState == .loading {
+                            // Skeleton loading con nombre si está disponible
+                            DetailLoadingView(cryptoName: getCryptoName())
+                        } else if case .failure(_) = viewModel.detailLoadingState {
+                            // Error state con retry
+                            ErrorStateView(
+                                title: "Error cargando detalles",
+                                message: viewModel.errorMessage ?? "No se pudieron cargar los detalles de esta criptomoneda",
+                                retryAction: {
+                                    viewModel.retryDetailLoad(id: cryptoId) { _ in }
+                                }
+                            )
+                            .padding()
+                        } else {
+                            // Estado inicial - intentar cargar
+                            VStack(spacing: 16) {
+                                Image(systemName: "bitcoinsign.circle")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.cryptoBlue)
+                                
+                                Text("Cargando información")
+                                    .font(.title3.bold())
+                                    .foregroundColor(.primaryText)
+                                
+                                Text("Obteniendo los detalles de la criptomoneda")
+                                    .font(.body)
+                                    .foregroundColor(.secondaryText)
+                                    .multilineTextAlignment(.center)
+                                
+                                Button(action: {
+                                    viewModel.fetchCryptoDetail(id: cryptoId) { _ in }
+                                }) {
+                                    Text("Cargar detalles")
+                                        .font(.callout.bold())
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 12)
+                                        .background(Color.cryptoBlue)
+                                        .cornerRadius(12)
+                                }
+                            }
+                            .padding()
+                        }
+                        
+                        Spacer()
+                    }
+                }
+                .navigationTitle(getCryptoName())
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .onAppear {
+            if !hasAppeared {
+                hasAppeared = true
+                // Solo intentar cargar si no hay datos y no se está cargando
+                if crypto == nil && viewModel.detailLoadingState != .loading {
+                    viewModel.fetchCryptoDetail(id: cryptoId) { _ in }
+                }
+            }
+        }
+    }
+    
+    private func getCryptoName() -> String {
+        // Intentar obtener el nombre de los datos existentes
         if let crypto = crypto {
-            GeometryReader { geometry in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: adaptiveSpacing) {
-                        // Header principal
-                        HStack(alignment: .center, spacing: adaptiveSpacing) {
+            return crypto.name
+        }
+        
+        // Buscar en la lista general
+        if let crypto = viewModel.cryptos.first(where: { $0.id == cryptoId }) {
+            return crypto.name
+        }
+        
+        return "Criptomoneda"
+    }
+    
+    @ViewBuilder
+    private func cryptoDetailContent(crypto: Cryptocurrency) -> some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: adaptiveSpacing) {
+                    // Header principal
+                    HStack(alignment: .center, spacing: adaptiveSpacing) {
+                        AsyncImage(url: URL(string: "https://s2.coinmarketcap.com/static/img/coins/64x64/\(crypto.id).png")) { image in
+                            image
+                                .resizable()
+                                .scaledToFit()
+                        } placeholder: {
                             Circle()
                                 .fill(Color.surfaceBackground)
-                                .frame(width: adaptiveLogoSize, height: adaptiveLogoSize)
                                 .overlay(
                                     Text(crypto.symbol.prefix(1))
                                         .font(adaptiveSymbolFont)
                                         .foregroundColor(.secondaryText)
                                 )
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(crypto.name)
-                                    .font(adaptiveNameFont)
-                                    .foregroundColor(.primaryText)
-                                    .lineLimit(DeviceInfo.isIPad ? 2 : 1)
-                                Text(crypto.symbol)
-                                    .font(adaptiveCaptionFont)
-                                    .foregroundColor(.secondaryText)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing) {
-                                Text(crypto.quote?.USD?.price?.formatted(.currency(code: "USD")) ?? "-")
-                                    .font(adaptivePriceFont)
-                                    .foregroundColor(.primaryText)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
                         }
-                        .padding(.bottom, 4)
+                        .frame(width: adaptiveLogoSize, height: adaptiveLogoSize)
                         
-                        Divider()
-                            .background(Color.separatorColor)
-                        
-                        // Estadísticas de cambio
-                        HStack(spacing: adaptiveSpacing) {
-                            StatBox(title: "1h", value: crypto.quote?.USD?.percent_change_1h)
-                            StatBox(title: "24h", value: crypto.quote?.USD?.percent_change_24h)
-                            StatBox(title: "7d", value: crypto.quote?.USD?.percent_change_7d)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(crypto.name)
+                                .font(adaptiveNameFont)
+                                .foregroundColor(.primaryText)
+                                .lineLimit(DeviceInfo.isIPad ? 2 : 1)
+                            Text(crypto.symbol)
+                                .font(adaptiveCaptionFont)
+                                .foregroundColor(.secondaryText)
                         }
-                        
-                        Divider()
-                            .background(Color.separatorColor)
-                        
-                        // Información detallada
-                        VStack(spacing: adaptiveInfoSpacing) {
-                            InfoRowPro(label: "Capitalización de mercado", value: crypto.quote?.USD?.market_cap?.formatted(.currency(code: "USD")), icon: "chart.bar.fill")
-                            InfoRowPro(label: "Volumen (24h)", value: crypto.quote?.USD?.volume_24h?.formatted(.currency(code: "USD")), icon: "waveform.path.ecg")
-                            InfoRowPro(label: "Oferta circulante", value: crypto.circulating_supply?.formatted(), icon: "arrow.2.circlepath.circle")
-                            InfoRowPro(label: "Oferta total", value: crypto.total_supply?.formatted(), icon: "circle.grid.cross")
-                            InfoRowPro(label: "Oferta máxima", value: crypto.max_supply?.formatted(), icon: "lock.circle")
-                            InfoRowPro(label: "Ranking CMC", value: crypto.cmc_rank != nil ? "#\(crypto.cmc_rank!)" : "-", icon: "number.circle")
-                            InfoRowPro(label: "Fecha de incorporación", value: crypto.date_added, icon: "calendar")
-                            InfoRowPro(label: "Plataforma", value: crypto.platform?.name, icon: "cube")
-                            if let tags = crypto.tags, !tags.isEmpty {
-                                InfoRowPro(label: "Etiquetas", value: tags.joined(separator: ", "), icon: "tag")
-                            }
-                        }
-                        .padding(.top, 8)
-                        
                         Spacer()
                     }
-                    .padding(adaptivePadding)
-                    .adaptiveFrame()
+                    
+                    // Precio principal
+                    VStack(alignment: .leading, spacing: adaptiveSpacing * 0.5) {
+                        Text(crypto.quote?.USD?.price?.formatted(.currency(code: "USD")) ?? "No disponible")
+                            .font(adaptivePriceFont)
+                            .foregroundColor(.primaryText)
+                        
+                        // Cambios de precio
+                        HStack(spacing: adaptiveSpacing) {
+                            if let change1h = crypto.quote?.USD?.percent_change_1h {
+                                ChangeLabel(title: "1h", change: change1h)
+                            }
+                            if let change24h = crypto.quote?.USD?.percent_change_24h {
+                                ChangeLabel(title: "24h", change: change24h)
+                            }
+                            if let change7d = crypto.quote?.USD?.percent_change_7d {
+                                ChangeLabel(title: "7d", change: change7d)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .padding(.vertical, adaptiveSpacing)
+                    .padding(.horizontal, adaptiveSpacing)
+                    .background(
+                        RoundedRectangle(cornerRadius: adaptiveCornerRadius)
+                            .fill(Color.cardBackground)
+                            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
+                    )
+                    
+                    // Información detallada
+                    VStack(spacing: adaptiveInfoSpacing) {
+                        InfoRowPro(label: "Capitalización de mercado", value: crypto.quote?.USD?.market_cap?.formatted(.currency(code: "USD")), icon: "chart.bar.fill")
+                        InfoRowPro(label: "Volumen (24h)", value: crypto.quote?.USD?.volume_24h?.formatted(.currency(code: "USD")), icon: "waveform.path.ecg")
+                        InfoRowPro(label: "Oferta circulante", value: crypto.circulating_supply?.formatted(), icon: "arrow.2.circlepath.circle")
+                        InfoRowPro(label: "Oferta total", value: crypto.total_supply?.formatted(), icon: "circle.grid.cross")
+                        InfoRowPro(label: "Oferta máxima", value: crypto.max_supply?.formatted(), icon: "lock.circle")
+                        InfoRowPro(label: "Ranking CMC", value: crypto.cmc_rank != nil ? "#\(crypto.cmc_rank!)" : "-", icon: "number.circle")
+                        InfoRowPro(label: "Fecha de incorporación", value: crypto.date_added, icon: "calendar")
+                        InfoRowPro(label: "Plataforma", value: crypto.platform?.name, icon: "cube")
+                        if let tags = crypto.tags, !tags.isEmpty {
+                            InfoRowPro(label: "Etiquetas", value: tags.joined(separator: ", "), icon: "tag")
+                        }
+                    }
+                    .padding(.top, 8)
+                    
+                    Spacer()
                 }
-                .background(Color.mainBackground.ignoresSafeArea())
-                .navigationTitle(crypto.name)
-                .navigationBarTitleDisplayMode(.inline)
+                .padding(adaptivePadding)
+                .adaptiveFrame()
             }
-        } else {
-            ProgressView("Cargando detalles...")
-                .navigationTitle("")
+            .background(Color.mainBackground.ignoresSafeArea())
+            .navigationTitle(crypto.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .refreshable {
+                viewModel.fetchCryptoDetail(id: cryptoId) { _ in }
+            }
         }
     }
     
     private var adaptiveSpacing: CGFloat {
-        DeviceInfo.isIPad ? 32 : (DeviceInfo.isLargeScreen ? 24 : 20)
+        DeviceInfo.isIPad ? 20 : (DeviceInfo.isLargeScreen ? 16 : 12)
     }
     
-    private var adaptiveInfoSpacing: CGFloat {
-        DeviceInfo.isIPad ? 20 : 16
+    private var adaptivePadding: CGFloat {
+        DeviceInfo.isIPad ? 32 : (DeviceInfo.isLargeScreen ? 24 : 20)
     }
     
     private var adaptiveLogoSize: CGFloat {
-        DeviceInfo.isIPad ? 64 : (DeviceInfo.isLargeScreen ? 52 : 48)
-    }
-    
-    private var adaptivePadding: CGFloat {
-        DeviceInfo.isIPad ? 32 : (DeviceInfo.isLargeScreen ? 24 : 20)
-    }
-    
-    private var adaptiveNameFont: Font {
-        DeviceInfo.isIPad ? .largeTitle.bold() : .title.bold()
-    }
-    
-    private var adaptivePriceFont: Font {
-        DeviceInfo.isIPad ? .title.bold() : .title2.bold()
-    }
-    
-    private var adaptiveCaptionFont: Font {
-        DeviceInfo.isIPad ? .title3 : .headline
-    }
-    
-    private var adaptiveSymbolFont: Font {
-        DeviceInfo.isIPad ? .largeTitle.bold() : .title.bold()
-    }
-}
-
-struct StatBox: View {
-    let title: String
-    let value: Double?
-    
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(title)
-                .font(adaptiveTitleFont)
-                .foregroundColor(.secondaryText)
-            Text(value != nil ? String(format: "%+.2f%%", value!) : "-")
-                .font(adaptiveValueFont)
-                .foregroundColor((value ?? 0) >= 0 ? .cryptoGreen : .cryptoRed)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(adaptivePadding)
-        .background(Color.surfaceBackground)
-        .cornerRadius(adaptiveCornerRadius)
-    }
-    
-    private var adaptiveTitleFont: Font {
-        DeviceInfo.isIPad ? .footnote : .caption
-    }
-    
-    private var adaptiveValueFont: Font {
-        DeviceInfo.isIPad ? .title3.bold() : .headline
-    }
-    
-    private var adaptivePadding: CGFloat {
-        DeviceInfo.isIPad ? 12 : 8
+        DeviceInfo.isIPad ? 80 : (DeviceInfo.isLargeScreen ? 60 : 50)
     }
     
     private var adaptiveCornerRadius: CGFloat {
-        DeviceInfo.isIPad ? 12 : 8
+        DeviceInfo.isIPad ? 16 : 12
+    }
+    
+    private var adaptiveNameFont: Font {
+        DeviceInfo.isIPad ? .title.bold() : .title2.bold()
+    }
+    
+    private var adaptivePriceFont: Font {
+        DeviceInfo.isIPad ? .largeTitle.bold() : .title.bold()
+    }
+    
+    private var adaptiveSymbolFont: Font {
+        DeviceInfo.isIPad ? .title2.bold() : .headline.bold()
+    }
+    
+    private var adaptiveCaptionFont: Font {
+        DeviceInfo.isIPad ? .callout : .caption
+    }
+    
+    private var adaptiveInfoSpacing: CGFloat {
+        DeviceInfo.isIPad ? 14 : 12
     }
 }
 
+// Componente para mostrar cambios de precio
+struct ChangeLabel: View {
+    let title: String
+    let change: Double
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(.secondaryText)
+            
+            Text(change.toPercentage())
+                .font(.caption2.bold())
+                .foregroundColor(change >= 0 ? .cryptoGreen : .cryptoRed)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.surfaceBackground)
+        )
+    }
+}
+
+// Componente para mostrar información en filas
 struct InfoRowPro: View {
     let label: String
     let value: String?
     let icon: String
     
     var body: some View {
-        HStack(spacing: adaptiveSpacing) {
+        HStack {
             Image(systemName: icon)
+                .font(.caption)
                 .foregroundColor(.cryptoBlue)
-                .frame(width: adaptiveIconSize)
-                .font(adaptiveIconFont)
+                .frame(width: 16)
+            
             Text(label)
-                .font(adaptiveLabelFont)
+                .font(DeviceInfo.isIPad ? .callout : .caption)
                 .foregroundColor(.secondaryText)
+            
             Spacer()
-            Text(value ?? "-")
-                .font(adaptiveValueFont)
+            
+            Text(value ?? "No disponible")
+                .font(DeviceInfo.isIPad ? .callout : .caption)
                 .foregroundColor(.primaryText)
-                .multilineTextAlignment(.trailing)
-                .lineLimit(2)
+                .lineLimit(1)
         }
-    }
-    
-    private var adaptiveSpacing: CGFloat {
-        DeviceInfo.isIPad ? 16 : 10
-    }
-    
-    private var adaptiveIconSize: CGFloat {
-        DeviceInfo.isIPad ? 28 : 22
-    }
-    
-    private var adaptiveIconFont: Font {
-        DeviceInfo.isIPad ? .title3 : .body
-    }
-    
-    private var adaptiveLabelFont: Font {
-        DeviceInfo.isIPad ? .body : .subheadline
-    }
-    
-    private var adaptiveValueFont: Font {
-        DeviceInfo.isIPad ? .body.bold() : .subheadline.bold()
+        .padding(.vertical, 6)
     }
 }
