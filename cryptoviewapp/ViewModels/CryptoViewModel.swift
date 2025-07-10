@@ -14,8 +14,48 @@ class CryptoViewModel: ObservableObject {
     @Published var loadingState: LoadingState = .idle
     @Published var detailLoadingState: LoadingState = .idle
     @Published var errorMessage: String?
+    @Published var favoriteIds: Set<String> = []
+    @Published var searchText: String = ""
+    @Published var isGridView: Bool = false
+    @Published var updatingPrices: Bool = false
     
     private let service = CryptoService()
+    private let favoritesKey = "favorite_cryptos"
+    
+    var filteredCryptos: [Cryptocurrency] {
+        if searchText.isEmpty {
+            return cryptos
+        } else {
+            return cryptos.filter { $0.name.localizedCaseInsensitiveContains(searchText) || $0.symbol.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+    
+    init() {
+        loadFavorites()
+    }
+    
+    func toggleFavorite(id: String) {
+        if favoriteIds.contains(id) {
+            favoriteIds.remove(id)
+        } else {
+            favoriteIds.insert(id)
+        }
+        saveFavorites()
+    }
+    
+    func isFavorite(id: String) -> Bool {
+        favoriteIds.contains(id)
+    }
+    
+    private func saveFavorites() {
+        UserDefaults.standard.set(Array(favoriteIds), forKey: favoritesKey)
+    }
+    
+    private func loadFavorites() {
+        if let saved = UserDefaults.standard.array(forKey: favoritesKey) as? [String] {
+            favoriteIds = Set(saved)
+        }
+    }
     
     func fetchCryptos() {
         // Evitar múltiples cargas simultáneas
@@ -129,6 +169,25 @@ class CryptoViewModel: ObservableObject {
         }
         if case .failure(_) = detailLoadingState {
             detailLoadingState = .idle
+        }
+    }
+    
+    func fetchHistoricalPrices(for id: String, completion: @escaping ([Double]?) -> Void) {
+        // Últimas 24h, intervalo 1h
+        let now = Date()
+        let start = Calendar.current.date(byAdding: .hour, value: -24, to: now) ?? now
+        let formatter = ISO8601DateFormatter()
+        let timeStart = formatter.string(from: start)
+        service.fetchHistoricalPrices(for: id, interval: "1h", timeStart: timeStart, timeEnd: nil) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let quotes):
+                    let prices = quotes.map { $0.quote.USD.price }
+                    completion(prices)
+                case .failure(_):
+                    completion(nil)
+                }
+            }
         }
     }
 }

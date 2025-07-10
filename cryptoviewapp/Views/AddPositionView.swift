@@ -13,22 +13,38 @@ struct AddPositionView: View {
     @FocusState private var focusedField: Field?
     
     let editingPosition: PortfolioPosition?
-    
+    var preselectedCrypto: Cryptocurrency? = nil
+
     enum Field: Hashable {
         case investment, price
     }
     
-    init(portfolioViewModel: PortfolioViewModel, cryptoViewModel: CryptoViewModel, editingPosition: PortfolioPosition? = nil) {
+    init(portfolioViewModel: PortfolioViewModel, cryptoViewModel: CryptoViewModel, editingPosition: PortfolioPosition? = nil, preselectedCrypto: Cryptocurrency? = nil) {
         self.portfolioViewModel = portfolioViewModel
         self.cryptoViewModel = cryptoViewModel
         self.editingPosition = editingPosition
+        self.preselectedCrypto = preselectedCrypto
         
+        // Inicialización de estado
         if let position = editingPosition {
-            // Calcular el monto invertido original
-            let totalInvested = position.amount * position.purchasePrice
-            _investmentAmount = State(initialValue: String(format: "%.2f", totalInvested))
-            _purchasePrice = State(initialValue: String(position.purchasePrice))
+            _selectedCrypto = State(initialValue: cryptoViewModel.getCrypto(by: position.cryptoId))
+            _investmentAmount = State(initialValue: String(format: "%.2f", position.totalInvested))
+            _purchasePrice = State(initialValue: String(format: "%.6f", position.purchasePrice))
             _purchaseDate = State(initialValue: position.purchaseDate)
+        } else if let crypto = preselectedCrypto {
+            _selectedCrypto = State(initialValue: crypto)
+            if let price = crypto.quote?.USD?.price {
+                _purchasePrice = State(initialValue: String(format: "%.6f", price))
+            } else {
+                _purchasePrice = State(initialValue: "")
+            }
+            _investmentAmount = State(initialValue: "")
+            _purchaseDate = State(initialValue: Date())
+        } else {
+            _selectedCrypto = State(initialValue: nil)
+            _investmentAmount = State(initialValue: "")
+            _purchasePrice = State(initialValue: "")
+            _purchaseDate = State(initialValue: Date())
         }
     }
     
@@ -189,7 +205,10 @@ struct AddPositionView: View {
             }
             .onAppear {
                 if let position = editingPosition {
-                    selectedCrypto = cryptoViewModel.getCrypto(by: position.cryptoId)
+                    // El estado ya se inicializa en el init
+                } else if preselectedCrypto == nil {
+                    // Forzar selección si no hay preselección
+                    showingCryptoSelection = true
                 }
             }
         }
@@ -339,22 +358,5 @@ struct CryptoSelectionView: View {
                 cryptoViewModel.fetchCryptos()
             }
         }
-    }
-}
-
-struct SearchBar: View {
-    @Binding var text: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.tertiaryText)
-            TextField("Buscar criptomoneda...", text: $text)
-                .textFieldStyle(PlainTextFieldStyle())
-        }
-        .padding()
-        .background(Color.surfaceBackground)
-        .cornerRadius(10)
-        .padding(.horizontal)
     }
 } 

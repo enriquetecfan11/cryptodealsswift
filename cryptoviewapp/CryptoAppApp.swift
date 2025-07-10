@@ -20,6 +20,15 @@ struct CryptoAppApp: App {
 }
 
 struct MainTabView: View {
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.systemGray6 // Color minimalista
+        UITabBar.appearance().standardAppearance = appearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+        }
+    }
     var body: some View {
         TabView {
             NavigationView { HomeView() }

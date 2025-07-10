@@ -2,101 +2,144 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var viewModel: CryptoViewModel
-    let destacados = ["BTC", "ETH", "XRP", "SOL", "BNB", "DOGE"]
+    @StateObject private var portfolioViewModel = PortfolioViewModel(cryptoViewModel: CryptoViewModel())
+    
+    let destacados = ["BTC", "ETH", "XRP", "SOL", "BNB", "DOGE", "LINK", "XMR"]
+    let categorias = ["Destacadas", "Top ganadoras", "Mayor Actividad"]
+    @State private var categoriaSeleccionada = 0
+    @State private var mostrarAddPosition = false
+    @State private var cryptoSeleccionada: Cryptocurrency? = nil
     
     var body: some View {
         GeometryReader { geometry in
-            VStack(alignment: .leading) {
-                Text("Criptomonedas Destacadas")
-                    .font(DeviceInfo.isIPad ? .title.bold() : .title2.bold())
-                    .padding([.top, .horizontal], adaptivePadding)
-                
-                // Contenido principal
-                if viewModel.loadingState == .loading && viewModel.cryptos.isEmpty {
-                    // Skeleton loading para las cards destacadas
-                    LazyVGrid(columns: adaptiveColumns, spacing: adaptiveSpacing) {
-                        ForEach(destacados, id: \.self) { symbol in
-                            CryptoFeaturedCardPlaceholderPro(symbol: symbol)
+            VStack(alignment: .leading, spacing: 0) {
+                // Carrusel de categorías
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(categorias.indices, id: \.self) { idx in
+                            Button(action: {
+                                categoriaSeleccionada = idx
+                            }) {
+                                Text(categorias[idx])
+                                    .font(.callout.bold())
+                                    .foregroundColor(categoriaSeleccionada == idx ? Color(.systemBackground) : .primaryText)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 20)
+                                    .background(
+                                        categoriaSeleccionada == idx ? Color.primary : Color.cardBackground
+                                    )
+                                    .cornerRadius(18)
+                                    .shadow(color: .clear, radius: 0)
+                            }
                         }
                     }
                     .padding(.horizontal, adaptivePadding)
-                } else if case .failure(_) = viewModel.loadingState, viewModel.cryptos.isEmpty {
-                    // Error state con retry
-                    VStack(spacing: 16) {
-                        Image(systemName: "wifi.exclamationmark")
-                            .font(.system(size: 48))
-                            .foregroundColor(.cryptoRed)
-                        
-                        Text("Error de conexión")
-                            .font(.title3.bold())
-                            .foregroundColor(.primaryText)
-                        
-                        Text(viewModel.errorMessage ?? "No se pudieron cargar las criptomonedas")
-                            .font(.body)
-                            .foregroundColor(.secondaryText)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        
-                        Button(action: {
-                            viewModel.retryCryptos()
-                        }) {
-                            HStack {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Reintentar")
+                    .padding(.top, adaptivePadding)
+                    .padding(.bottom, 8)
+                }
+                
+                // Título
+                Text("\(categorias[categoriaSeleccionada])")
+                    .font(DeviceInfo.isIPad ? .title.bold() : .title2.bold())
+                    .padding(.horizontal, adaptivePadding)
+                    .padding(.bottom, 4)
+                
+                // Contenido principal
+                Group {
+                    if viewModel.loadingState == .loading && viewModel.cryptos.isEmpty {
+                        LazyVGrid(columns: adaptiveColumns, spacing: adaptiveSpacing) {
+                            ForEach(destacados, id: \.self) { symbol in
+                                CryptoFeaturedCardPlaceholderPro(symbol: symbol)
                             }
-                            .font(.callout.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
-                            .background(Color.cryptoBlue)
-                            .cornerRadius(12)
                         }
-                    }
-                    .padding(.vertical, 40)
-                } else if viewModel.cryptos.isEmpty {
-                    // Estado sin datos
-                    VStack(spacing: 16) {
-                        Image(systemName: "chart.line.uptrend.xyaxis")
-                            .font(.system(size: 48))
-                            .foregroundColor(.placeholderText)
-                        
-                        Text("No hay datos disponibles")
-                            .font(.title3.bold())
-                            .foregroundColor(.primaryText)
-                        
-                        Text("Intenta cargar los datos nuevamente")
-                            .font(.body)
-                            .foregroundColor(.secondaryText)
-                        
-                        Button(action: {
-                            viewModel.fetchCryptos()
-                        }) {
-                            Text("Cargar datos")
+                        .padding(.horizontal, adaptivePadding)
+                    } else if case .failure(_) = viewModel.loadingState, viewModel.cryptos.isEmpty {
+                        // Error state con retry
+                        VStack(spacing: 16) {
+                            Image(systemName: "wifi.exclamationmark")
+                                .font(.system(size: 48))
+                                .foregroundColor(.cryptoRed)
+                            
+                            Text("Error de conexión")
+                                .font(.title3.bold())
+                                .foregroundColor(.primaryText)
+                            
+                            Text(viewModel.errorMessage ?? "No se pudieron cargar las criptomonedas")
+                                .font(.body)
+                                .foregroundColor(.secondaryText)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            
+                            Button(action: {
+                                viewModel.retryCryptos()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Reintentar")
+                                }
                                 .font(.callout.bold())
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 24)
                                 .padding(.vertical, 12)
                                 .background(Color.cryptoBlue)
                                 .cornerRadius(12)
-                        }
-                    }
-                    .padding(.vertical, 40)
-                } else {
-                    // Contenido normal
-                    LazyVGrid(columns: adaptiveColumns, spacing: adaptiveSpacing) {
-                        ForEach(destacados, id: \.self) { symbol in
-                            if let crypto = viewModel.cryptos.first(where: { $0.symbol == symbol }) {
-                                NavigationLink(destination: CryptoDetailView(cryptoId: String(crypto.id))) {
-                                    CryptoFeaturedCardPro(crypto: crypto)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            } else {
-                                CryptoFeaturedCardPlaceholderPro(symbol: symbol)
                             }
                         }
+                        .padding(.vertical, 40)
+                    } else if viewModel.cryptos.isEmpty {
+                        // Estado sin datos
+                        VStack(spacing: 16) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.system(size: 48))
+                                .foregroundColor(.placeholderText)
+                            
+                            Text("No hay datos disponibles")
+                                .font(.title3.bold())
+                                .foregroundColor(.primaryText)
+                            
+                            Text("Intenta cargar los datos nuevamente")
+                                .font(.body)
+                                .foregroundColor(.secondaryText)
+                            
+                            Button(action: {
+                                viewModel.fetchCryptos()
+                            }) {
+                                Text("Cargar datos")
+                                    .font(.callout.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 12)
+                                    .background(Color.cryptoBlue)
+                                    .cornerRadius(12)
+                            }
+                        }
+                        .padding(.vertical, 40)
+                    } else {
+                        // Selección de criptos según categoría
+                        let cryptosToShow: [Cryptocurrency] = {
+                            switch categoriaSeleccionada {
+                            case 1: // Top ganadoras
+                                return viewModel.cryptos.sorted { ($0.quote?.USD?.percent_change_24h ?? 0) > ($1.quote?.USD?.percent_change_24h ?? 0) }.prefix(6).map { $0 }
+                            case 2: // Más negociadas
+                                return viewModel.cryptos.sorted { ($0.quote?.USD?.volume_24h ?? 0) > ($1.quote?.USD?.volume_24h ?? 0) }.prefix(6).map { $0 }
+                            default: // Destacadas
+                                return destacados.compactMap { symbol in viewModel.cryptos.first(where: { $0.symbol == symbol }) }
+                            }
+                        }()
+                        LazyVGrid(columns: adaptiveColumns, spacing: adaptiveSpacing) {
+                            ForEach(cryptosToShow, id: \.id) { crypto in
+                                CryptoFeaturedCardPro(
+                                    crypto: crypto,
+                                    onTap: {
+                                        cryptoSeleccionada = crypto
+                                        mostrarAddPosition = true
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, adaptivePadding)
+                        .padding(.bottom, 8)
                     }
-                    .padding(.horizontal, adaptivePadding)
-                    .padding(.bottom, 8)
                 }
                 
                 // Indicador de actualización cuando ya hay datos
@@ -124,6 +167,19 @@ struct HomeView: View {
             .adaptiveFrame()
             .background(Color.mainBackground.ignoresSafeArea())
             .environmentObject(viewModel)
+            .sheet(isPresented: $mostrarAddPosition) {
+                if let crypto = cryptoSeleccionada {
+                    AddPositionView(
+                        portfolioViewModel: portfolioViewModel,
+                        cryptoViewModel: viewModel,
+                        editingPosition: nil
+                    )
+                    .onAppear {
+                        // Preseleccionar la cripto
+                        // Esto requiere modificar AddPositionView para aceptar una cripto preseleccionada si se desea UX óptima
+                    }
+                }
+            }
             .onAppear {
                 // Solo cargar si no hay datos
                 if viewModel.cryptos.isEmpty {
@@ -133,7 +189,6 @@ struct HomeView: View {
             .refreshable {
                 viewModel.fetchCryptos()
             }
-            .navigationTitle("Inicio")
         }
     }
     
@@ -198,10 +253,14 @@ struct CryptoFeaturedCardPlaceholderPro: View {
 // Componente para mostrar card destacada real
 struct CryptoFeaturedCardPro: View {
     let crypto: Cryptocurrency
+    var onTap: (() -> Void)? = nil
     
     var body: some View {
-        VStack(spacing: adaptiveSpacing) {
-            HStack(spacing: adaptiveSpacing) {
+        Button(action: {
+            onTap?()
+        }) {
+            VStack(spacing: 12) {
+                // Icono grande y centrado
                 if let url = logoURL {
                     AsyncImage(url: url) { image in
                         image.resizable().scaledToFit()
@@ -210,54 +269,65 @@ struct CryptoFeaturedCardPro: View {
                             .fill(Color.surfaceBackground)
                             .overlay(
                                 Text(crypto.symbol.prefix(1))
-                                    .font(adaptiveSymbolFont)
+                                    .font(.title2.bold())
                                     .foregroundColor(.secondaryText)
                             )
                     }
-                    .frame(width: adaptiveLogoSize, height: adaptiveLogoSize)
+                    .frame(width: 48, height: 48)
                 } else {
                     Circle()
                         .fill(Color.surfaceBackground)
-                        .frame(width: adaptiveLogoSize, height: adaptiveLogoSize)
+                        .frame(width: 48, height: 48)
                         .overlay(
                             Text(crypto.symbol.prefix(1))
-                                .font(adaptiveSymbolFont)
+                                .font(.title2.bold())
                                 .foregroundColor(.secondaryText)
                         )
                 }
-                VStack(alignment: .leading, spacing: 2) {
+                // Nombre y símbolo centrados
+                VStack(spacing: 2) {
                     Text(crypto.name)
-                        .font(adaptiveNameFont)
+                        .font(.headline)
                         .foregroundColor(.primaryText)
                         .lineLimit(1)
+                        .multilineTextAlignment(.center)
                     Text(crypto.symbol)
-                        .font(adaptiveCaptionFont)
+                        .font(.caption)
                         .foregroundColor(.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
+                // Precio y cambio porcentual alineados
+                HStack(spacing: 6) {
+                    Text(crypto.quote?.USD?.price?.formatted(.currency(code: "USD")) ?? "-")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primaryText)
+                    if let change = crypto.quote?.USD?.percent_change_24h {
+                        HStack(spacing: 2) {
+                            Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                                .font(.caption2)
+                                .foregroundColor(change >= 0 ? .cryptoGreen : .cryptoRed)
+                                .rotationEffect(.degrees(change >= 0 ? 0 : 180))
+                            Text(change.toPercentage())
+                                .font(.caption2.bold())
+                                .foregroundColor(change >= 0 ? .cryptoGreen : .cryptoRed)
+                        }
+                    }
                 }
             }
-            Text(crypto.quote?.USD?.price?.formatted(.currency(code: "USD")) ?? "-")
-                .font(adaptivePriceFont)
-                .foregroundColor(.primaryText)
-            
-            // Cambio de precio
-            if let change = crypto.quote?.USD?.percent_change_24h {
-                HStack(spacing: 4) {
-                    Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
-                        .font(.caption2)
-                        .foregroundColor(change >= 0 ? .cryptoGreen : .cryptoRed)
-                    
-                    Text(change.toPercentage())
-                        .font(.caption2.bold())
-                        .foregroundColor(change >= 0 ? .cryptoGreen : .cryptoRed)
-                }
-            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.primary.opacity(0.18), lineWidth: 1.2)
+                    )
+                    .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+            )
+            .scaleEffectOnTap()
         }
-        .padding(adaptivePadding)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.cardBackground)
-                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
-        )
+        .buttonStyle(PlainButtonStyle())
     }
     
     private var logoURL: URL? {

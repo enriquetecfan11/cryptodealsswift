@@ -1,4 +1,4 @@
-struct Cryptocurrency: Codable, Identifiable, Hashable {
+struct Cryptocurrency: Codable, Identifiable, Hashable, Equatable {
     let id: String
     let name: String
     let symbol: String
@@ -10,6 +10,7 @@ struct Cryptocurrency: Codable, Identifiable, Hashable {
     let total_supply: Double?
     let max_supply: Double?
     let platform: Platform?
+    var sparkline: [Double]? = nil // Para el gráfico miniatura
 
     struct Platform: Codable, Hashable {
         let name: String?
